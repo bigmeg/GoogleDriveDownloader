@@ -1,9 +1,10 @@
-from flask import Flask, render_template, flash, request, make_response, jsonify, redirect, url_for
-from wtforms import Form, validators, StringField
+from flask import Flask, render_template, flash, request, make_response, redirect, url_for
+from wtforms import Form, StringField
 from flask_httpauth import HTTPBasicAuth
 from transport import Manager
 from django.core.validators import URLValidator
 from django.core.exceptions import ValidationError
+import os
 
 # App config.
 USERNAME = 'admin'
