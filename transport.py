@@ -20,21 +20,20 @@ mime = MimeTypes()
 SCOPES = 'https://www.googleapis.com/auth/drive'
 CLIENT_SECRET_FILE = 'client_secrets.json'
 APPLICATION_NAME = 'GDD'
-CHUNKSIZE = 18 * 1024**2  # in MegaBytes, must be a multiple of 256 * 1024 bytes
-
+CHUNKSIZE = 16 * 1024**2  # in MegaBytes, must be a multiple of 256 * 1024 bytes
+RETRY = 4
 
 class Manager(object):
     def __init__(self):
         dir_path = os.path.dirname(os.path.realpath(__file__))
         credential_path = os.path.join(dir_path, 'drive-python-quickstart.json')
         store = oauth2client.file.Storage(credential_path)
-        credentials = store.get()
-        if not credentials or credentials.invalid:
+        self.credentials = store.get()
+        if not self.credentials or self.credentials.invalid:
             flow = client.flow_from_clientsecrets(CLIENT_SECRET_FILE, SCOPES)
             flow.user_agent = APPLICATION_NAME
-            credentials = tools.run_flow(flow, store, flags)
+            self.credentials = tools.run_flow(flow, store, flags)
             print('Storing credentials to ' + credential_path)
-        self.service = discovery.build('drive', 'v3', http=credentials.authorize(httplib2.Http()))
         self.download_arr = []
         self.upload_arr = []
         self.error_arr = []
@@ -67,28 +66,51 @@ class Manager(object):
             obj.status = "uploading"
             file_metadata = {'name': os.path.basename(obj.dest)}
 
+            service = discovery.build('drive', 'v3', http=self.credentials.authorize(httplib2.Http()))
             media = MediaFileUpload(obj.dest,
                                     mimetype=mime.guess_type(os.path.basename(obj.dest))[0],
                                     chunksize=CHUNKSIZE,
                                     resumable=True)
-            request = self.service.files().create(body=file_metadata,
-                                                  media_body=media)
+            request = service.files().create(body=file_metadata,
+                                             media_body=media)
             response = None
-            try:
-                while response is None:
-                    pretime = time.time()
-                    status, response = request.next_chunk()
-                    time_elapsed = time.time() - pretime
-                    if status:
-                        status.speed = '%.1f' % (CHUNKSIZE / 1024**2 / time_elapsed) + 'MB/s'
-                        obj.up_status = status
-            except HttpError as e:
-                obj.errors.append(e)
-                self.upload_arr.remove(obj)
-                self.error_arr.append(obj)
-                continue
+            retry = RETRY
+            fail = False
+            while retry > 0:
+                try:
+                    while response is None:
+                        pretime = time.time()
+                        status, response = request.next_chunk()
+                        time_elapsed = time.time() - pretime
+                        if retry < RETRY:
+                            obj.status = "uploading retrying at " + str(RETRY - retry)
+                        if status:
+                            status.speed = '%.1f' % (CHUNKSIZE / 1024**2 / time_elapsed) + 'MB/s'
+                            obj.up_status = status
+                    break
+                except HttpError as e:
+                    if e.resp.status in [404]:
+                        retry -= 1
+                        service = discovery.build('drive', 'v3', http=self.credentials.authorize(httplib2.Http()))
+                        request = service.files().create(body=file_metadata,
+                                                         media_body=media)
+                        response = None
+                    elif e.resp.status in [500, 502, 503, 504]:
+                        retry -= 1
+                    else:
+                        obj.errors.append(e)
+                        self.error_arr.append(obj)
+                        fail = True
+                        break
+                except Exception as e:
+                    obj.errors.append(e)
+                    self.error_arr.append(obj)
+                    fail = True
+                    break
+
             self.upload_arr.remove(obj)
-            os.remove(obj.dest)
+            if not fail:
+                os.remove(obj.dest)
 
     def add_new_task(self, url, filename):
         dest = os.path.expanduser('~/Downloads/' + filename)
