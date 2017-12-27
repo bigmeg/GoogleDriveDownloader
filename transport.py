@@ -120,13 +120,13 @@ class Manager(object):
     def add_new_task(self, url, filename):
         dest = os.path.expanduser('~/Downloads/' + filename)
         obj = SmartDL(url, dest=dest, progress_bar=False, threads=1)
+        obj.filename = filename
         try:
             obj.start(blocking=False)
         except Exception as e:
             obj.errors.append(e)
             self.error_arr.append(obj)
             return
-        obj.filename = filename
         self.download_arr.append(obj)
 
     def get_auth_url(self):
