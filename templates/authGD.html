@@ -1,7 +1,7 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html>
     <head>
-        <title>Google Drive Downloader</title>
+        <title>GDrive Authentication Page</title>
        <link rel="stylesheet" media="screen" href ="static/bootstrap.min.css">
        <link rel="stylesheet" href="static/bootstrap-theme.min.css">
        <meta name="viewport" content = "width=device-width, initial-scale=1.0">
@@ -13,17 +13,17 @@
 <div class="container">
 
 
-  <h2>Google Drive Downloader</h2>
-  {{ WarningBar|safe }}
+  <h2>Google Drive Downloader Authentication Page</h2>
+  <br>
+  <h3>Please visit this link to sign in your Google account and then fill in the returned code</h3>
+  <br>
+  <a href="{{ link|safe }}" target="_blank">Google Drive Authentication Link</a>
+  <br><br><br>
   <form  action="" method="post" role="form">
     {{ form.csrf }}
     <div class="form-group">
-      <label for="name">Name:</label>
-      <input type="text" class="form-control" id="name" name="name" placeholder="Name of the file">
-      <br>
-      <label for="link">Link:</label>
-      <input type="text" class="form-control" id="link" name="link" placeholder="Link of the file">
-
+      <label for="code">Code:</label>
+      <input type="text" class="form-control" id="code" name="code" placeholder="code from the sign in page">
     </div>
     <button type="submit" class="btn btn-success">Submit</button>
   </form>
@@ -47,7 +47,6 @@
         {% endfor %}
             {% endif %}
         {% endwith %}
-  {{ GDDstatus|safe }}
 </div>
 <br>
 </div>

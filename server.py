@@ -4,7 +4,6 @@ from flask_httpauth import HTTPBasicAuth
 from transport import Manager
 from django.core.validators import URLValidator
 from django.core.exceptions import ValidationError
-import os
 
 # App config.
 USERNAME = 'admin'
@@ -18,14 +17,7 @@ app.config['SECRET_KEY'] = 'B12r98j/3yX R~XHH!jmN]LWX/,?RT'
 man = Manager()
 auth = HTTPBasicAuth()
 url_validator = URLValidator()
-
-
-def url_exist(url):
-    try:
-        url_validator(url)
-        return True
-    except ValidationError:
-        return False
+last_auth_url = None
 
 
 @auth.get_password
@@ -40,29 +32,53 @@ def unauthorized():
     return make_response("error: Unauthorized access", 401)
 
 
-class ReusableForm(Form):
-    name = StringField('Name:')
-    link = StringField('Link:')
-
-
 @app.route("/back", methods=['GET'])
 @auth.login_required
 def back():
     return redirect(url_for('index'))
 
 
+@app.route("/authGD", methods=['GET', 'POST'])
+@auth.login_required
+def authGD():
+    if man.auth_ready:
+        return redirect(url_for('back'))
+
+    class AuthForm(Form):
+        code = StringField('Code:')
+    form = AuthForm(request.form)
+    global last_auth_url
+    if request.method == 'POST':
+        code = request.form['code']
+        if code is None or code == '':
+            flash('Error: Please input code. ')
+            return render_template('authGD.html', form=form, link=last_auth_url)
+        if man.put_auth_code(code):
+            flash('Authentication Successful. ')
+            return redirect(url_for('back'))
+        else:
+            flash('Error: Authentication Failed. ')
+    last_auth_url = man.get_auth_url()
+    return render_template('authGD.html', form=form, link=last_auth_url)
+
+
 @app.route("/", methods=['GET', 'POST'])
 @auth.login_required
 def index():
-    form = ReusableForm(request.form)
+    class NewTaskForm(Form):
+        name = StringField('Name:')
+        link = StringField('Link:')
+    form = NewTaskForm(request.form)
 
-    print(form.errors)
     if request.method == 'POST':
         name = request.form['name']
         link = request.form['link']
-        valid_link = url_exist(link)
+        try:
+            url_validator(link)
+            valid_link = True
+        except ValidationError:
+            valid_link = False
         if form.validate() and valid_link:
-            # Save the comment here.
             man.add_new_task(link, name)
             flash('Add new task succeed ' + name)
         else:
@@ -76,7 +92,12 @@ def index():
     for x in res_down: info += x['formatedstring'] + '\n'
     for x in res_up: info += x['formatedstring'] + '\n'
     for x in res_err: info += x['formatedstring'] + '\n'
-    return render_template('GDD.html', form=form, GDDstatus=info.replace('\n', '<br>'))
+
+    wb = ''
+    if not man.auth_ready:
+        wb = "<br><div class=\"alert alert-danger\">"
+        wb += "<a href=\"/authGD\">Authentication Required with Google Drive</a></div>"
+    return render_template('GDD.html', form=form, GDDstatus=info.replace('\n', '<br>'), WarningBar=wb)
 
 
 if __name__ == "__main__":

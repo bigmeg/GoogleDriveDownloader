@@ -15,7 +15,6 @@ class Flag:
     logging_level = 'ERROR'
 
 
-flags = Flag()
 mime = MimeTypes()
 SCOPES = 'https://www.googleapis.com/auth/drive'
 CLIENT_SECRET_FILE = 'client_secrets.json'
@@ -23,27 +22,28 @@ APPLICATION_NAME = 'GDD'
 CHUNKSIZE = 16 * 1024**2  # in MegaBytes, must be a multiple of 256 * 1024 bytes
 RETRY = 4
 
+
 class Manager(object):
     def __init__(self):
-        dir_path = os.path.dirname(os.path.realpath(__file__))
-        credential_path = os.path.join(dir_path, 'drive-python-quickstart.json')
-        store = oauth2client.file.Storage(credential_path)
-        self.credentials = store.get()
-        if not self.credentials or self.credentials.invalid:
-            flow = client.flow_from_clientsecrets(CLIENT_SECRET_FILE, SCOPES)
-            flow.user_agent = APPLICATION_NAME
-            self.credentials = tools.run_flow(flow, store, flags)
-            print('Storing credentials to ' + credential_path)
+        credential_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'credential.json')
+        self.store = oauth2client.file.Storage(credential_path)
+        credentials = self.store.get()
+        if not credentials or credentials.invalid:
+            self.auth_ready = False
+            self.flow = None
+        else:
+            self.credentials = credentials
+            self.auth_ready = True
         self.download_arr = []
         self.upload_arr = []
         self.error_arr = []
         self.lock = threading.Lock()
-        self.th1 = threading.Thread(target=self.checker)
-        self.th1.setDaemon(True)
-        self.th1.start()
-        self.th2 = threading.Thread(target=self.uploader)
-        self.th2.setDaemon(True)
-        self.th2.start()
+        self.checkerThread = threading.Thread(target=self.checker)
+        self.checkerThread.setDaemon(True)
+        self.checkerThread.start()
+        self.uploaderThread = threading.Thread(target=self.uploader)
+        self.uploaderThread.setDaemon(True)
+        self.uploaderThread.start()
 
     def checker(self):
         while True:
@@ -59,7 +59,7 @@ class Manager(object):
 
     def uploader(self):
         while True:
-            if len(self.upload_arr) == 0:
+            if not self.auth_ready or len(self.upload_arr) == 0:
                 time.sleep(0.66)
                 continue
             obj = self.upload_arr[0]
@@ -79,9 +79,9 @@ class Manager(object):
             while retry > 0:
                 try:
                     while response is None:
-                        pretime = time.time()
+                        start_time = time.time()
                         status, response = request.next_chunk()
-                        time_elapsed = time.time() - pretime
+                        time_elapsed = time.time() - start_time
                         if retry < RETRY:
                             obj.status = "uploading retrying at " + str(RETRY - retry)
                         if status:
@@ -118,6 +118,24 @@ class Manager(object):
         obj.start(blocking=False)
         obj.filename = filename
         self.download_arr.append(obj)
+
+    def get_auth_url(self):
+        flow = client.flow_from_clientsecrets(CLIENT_SECRET_FILE, SCOPES)
+        flow.redirect_uri = client.OOB_CALLBACK_URN
+        flow.user_agent = APPLICATION_NAME
+        self.flow = flow
+        return flow.step1_get_authorize_url()
+
+    def put_auth_code(self, code):
+        try:
+            credential = self.flow.step2_exchange(code)
+        except client.FlowExchangeError:
+            return False
+        self.store.put(credential)
+        credential.set_store(self.store)
+        self.credentials = credential
+        self.auth_ready = True
+        return True
 
     def status(self):
         res_down = []
@@ -163,6 +181,9 @@ class Manager(object):
 
 if __name__ == "__main__":
     man = Manager()
+    if not man.auth_ready:
+        print(man.get_auth_url())
+        print(man.put_auth_code(input("Please visit the authentication link above and input the code: ").strip()))
     while True:
         string = input("Please specify command: s(status) or [link name]").strip()
         if string == 's':
