@@ -17,16 +17,21 @@ class Flag:
 
 mime = MimeTypes()
 SCOPES = 'https://www.googleapis.com/auth/drive'
-CLIENT_SECRET_FILE = 'client_secrets.json'
+CLIENT_SECRET_FILE = 'client_secrets.json'  # you probably don't want to change this
+CREDENTIAL_FILE = 'credential.json'  # if you have a credential from somewhere, you may try to use it
 APPLICATION_NAME = 'GDD'
 CHUNKSIZE = 16 * 1024**2  # in MegaBytes, must be a multiple of 256 * 1024 bytes
 RETRY = 4
 
 
+dir_path = os.path.dirname(os.path.realpath(__file__))
+CLIENT_SECRET_FILE = os.path.join(dir_path, CLIENT_SECRET_FILE)
+CREDENTIAL_FILE = os.path.join(dir_path, CREDENTIAL_FILE)
+
+
 class Manager(object):
     def __init__(self):
-        credential_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'credential.json')
-        self.store = oauth2client.file.Storage(credential_path)
+        self.store = oauth2client.file.Storage(CREDENTIAL_FILE)
         credentials = self.store.get()
         if not credentials or credentials.invalid:
             self.auth_ready = False
