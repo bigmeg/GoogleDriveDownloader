@@ -22,7 +22,6 @@ CREDENTIAL_FILE = 'credential.json'  # if you have a credential from somewhere, 
 APPLICATION_NAME = 'GDD'
 CHUNKSIZE = 16 * 1024**2  # upload chunk size in MegaBytes, must be a multiple of 256 * 1024 bytes
 RETRY = 4
-DLTHREAD = 2 # download thread
 
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -120,7 +119,7 @@ class Manager(object):
 
     def add_new_task(self, url, filename):
         dest = os.path.expanduser('~/Downloads/' + filename)
-        obj = SmartDL(url, dest=dest, progress_bar=False, threads=DLTHREAD)
+        obj = SmartDL(url, dest=dest, progress_bar=False, threads=1)
         obj.start(blocking=False)
         obj.filename = filename
         self.download_arr.append(obj)
