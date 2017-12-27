@@ -20,8 +20,9 @@ SCOPES = 'https://www.googleapis.com/auth/drive'
 CLIENT_SECRET_FILE = 'client_secrets.json'  # you probably don't want to change this
 CREDENTIAL_FILE = 'credential.json'  # if you have a credential from somewhere, you may try to use it
 APPLICATION_NAME = 'GDD'
-CHUNKSIZE = 16 * 1024**2  # in MegaBytes, must be a multiple of 256 * 1024 bytes
+CHUNKSIZE = 16 * 1024**2  # upload chunk size in MegaBytes, must be a multiple of 256 * 1024 bytes
 RETRY = 4
+DLTHREAD = 2 # download thread
 
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -119,7 +120,7 @@ class Manager(object):
 
     def add_new_task(self, url, filename):
         dest = os.path.expanduser('~/Downloads/' + filename)
-        obj = SmartDL(url, dest=dest, progress_bar=False, threads=1)
+        obj = SmartDL(url, dest=dest, progress_bar=False, threads=DLTHREAD)
         obj.start(blocking=False)
         obj.filename = filename
         self.download_arr.append(obj)

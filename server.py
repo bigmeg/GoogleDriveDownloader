@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 from flask import Flask, render_template, flash, request, make_response, redirect, url_for
 from wtforms import Form, StringField
 from flask_httpauth import HTTPBasicAuth
