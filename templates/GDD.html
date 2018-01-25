@@ -16,14 +16,14 @@
   <h2>Google Drive Downloader</h2>
   {{ WarningBar|safe }}
   <form  action="" method="post" role="form">
-    {{ form.csrf }}
     <div class="form-group">
       <label for="name">Name:</label>
       <input type="text" class="form-control" id="name" name="name" placeholder="Name of the file">
       <br>
       <label for="link">Link:</label>
       <input type="text" class="form-control" id="link" name="link" placeholder="Link of the file">
-
+      <input type="checkbox" name="upload" value="1" checked> upload at complete<br>
+      <input type="checkbox" name="delete" value="1" checked> delete after finish<br>
     </div>
     <button type="submit" class="btn btn-success">Submit</button>
   </form>

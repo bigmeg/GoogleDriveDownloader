@@ -1,11 +1,10 @@
-import os, threading, time
-from pySmartDL import SmartDL
+import os, threading, time, configparser
+from pySmartDL import SmartDL, utils
 from googleapiclient.errors import HttpError
 from apiclient import discovery
 import oauth2client
 from googleapiclient.http import MediaFileUpload
 from oauth2client import client
-from oauth2client import tools
 import httplib2
 from mimetypes import MimeTypes
 
@@ -15,13 +14,15 @@ class Flag:
     logging_level = 'ERROR'
 
 
+config = configparser.ConfigParser()
+config.read('settings.ini')
 mime = MimeTypes()
-SCOPES = 'https://www.googleapis.com/auth/drive'
-CLIENT_SECRET_FILE = 'client_secrets.json'  # you probably don't want to change this
-CREDENTIAL_FILE = 'credential.json'  # if you have a credential from somewhere, you may try to use it
-APPLICATION_NAME = 'GDD'
-CHUNKSIZE = 16 * 1024**2  # upload chunk size in MegaBytes, must be a multiple of 256 * 1024 bytes
-RETRY = 4
+SCOPES = config['transport']['SCOPE']
+CLIENT_SECRET_FILE = config['transport']['CLIENT_SECRET_FILE']
+CREDENTIAL_FILE = config['transport']['CREDENTIAL_FILE']
+APPLICATION_NAME = config['transport']['APPLICATION_NAME']
+CHUNKSIZE = int(config['transport']['CHUNKSIZE']) * 1024**2
+RETRY = int(config['transport']['RETRY'])
 
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -56,16 +57,17 @@ class Manager(object):
                 if obj.isFinished():
                     self.download_arr.remove(obj)
                     if obj.isSuccessful():
-                        obj.status = 'waiting for upload'
-                        self.upload_arr.append(obj)
+                        if obj.upload:
+                            obj.status = 'waiting for upload'
+                            self.upload_arr.append(obj)
+                        elif obj.delete:
+                            os.remove(obj.dest)
                     else:
                         self.error_arr.append(obj)
-            time.sleep(0.66)
 
     def uploader(self):
         while True:
             if not self.auth_ready or len(self.upload_arr) == 0:
-                time.sleep(0.66)
                 continue
             obj = self.upload_arr[0]
             obj.status = "uploading"
@@ -114,20 +116,21 @@ class Manager(object):
                     break
 
             self.upload_arr.remove(obj)
-            if not fail:
+            if not fail and obj.delete:
                 os.remove(obj.dest)
 
-    def add_new_task(self, url, filename):
+    def add_new_task(self, url, filename, upload=True, delete=True):
         dest = os.path.expanduser('~/Downloads/' + filename)
         obj = SmartDL(url, dest=dest, progress_bar=False, threads=1)
         obj.filename = filename
+        obj.upload = upload
+        obj.delete = delete
         try:
             obj.start(blocking=False)
+            self.download_arr.append(obj)
         except Exception as e:
             obj.errors.append(e)
             self.error_arr.append(obj)
-            return
-        self.download_arr.append(obj)
 
     def get_auth_url(self):
         flow = client.flow_from_clientsecrets(CLIENT_SECRET_FILE, SCOPES)
@@ -152,39 +155,26 @@ class Manager(object):
         res_up = []
         res_err =[]
         for obj in self.download_arr:
-            result = dict()
-            result['filename'] = obj.filename
-            result['speed'] = str(obj.get_speed(human=True))
-            result['downloaded'] = str(obj.get_dl_size(human=True))
-            result['fullsize'] = '%.1f' % (obj.filesize/1024.0**2)+" MB" if obj.filesize<1024**3 \
-                else '%.3f' % (obj.filesize/1024.0**3)+" GB"
-            result['eta'] = str(obj.get_eta(human=True))
-            result['progress'] = '%.1f'%(obj.get_progress() * 100) + "%"
-            result['formatedstring'] = \
-                result['filename'] + " : " + \
-                result['downloaded'] + " / " + \
-                result['fullsize'] + " @ " + \
-                result['speed'] + \
-                " [" + result['progress'] + ", " + result['eta'] + "]"
+            result = obj.filename + " : " + \
+                obj.get_dl_size(human=True) + " / " + \
+                utils.sizeof_human(obj.filesize) + " @ " + \
+                obj.get_speed(human=True) + \
+                " [" + '%.1f' % (obj.get_progress()*100) + "%, " + obj.get_eta(human=True) + "]"
             res_down.append(result)
         for obj in self.upload_arr:
-            result = dict()
-            result['formatedstring'] = obj.filename + " : " + obj.status
+            result = obj.filename + " : " + obj.status
             if obj.status == 'uploading':
                 if not hasattr(obj, 'up_status'):
-                    result['formatedstring'] += " but is updating information"
+                    result += " but is updating information"
                 else:
-                    result['formatedstring'] += " at %d%%" % int(obj.up_status.progress() * 100)
-                    result['formatedstring'] += " @ " + obj.up_status.speed
-                    result['formatedstring'] += " of " + ('%.1f' % (obj.up_status.total_size/1024.0**2)+" MB"
-                                                          if obj.up_status.total_size<1024**3
-                                                          else '%.1f' % (obj.up_status.total_size/1024.0**3)+" GB")
+                    result += " at %d%%" % int(obj.up_status.progress() * 100)
+                    result += " @ " + obj.up_status.speed
+                    result += " of " + utils.sizeof_human(obj.up_status.total_size)
             res_up.append(result)
         for obj in self.error_arr:
-            result = dict()
-            result['formatedstring'] = obj.filename + " : " + obj.status + '\n'
+            result = obj.filename + " : " + obj.status + '\n'
             for e in obj.get_errors():
-                result['formatedstring'] += str(e) + '\n'
+                result += str(e) + '\n'
             res_err.append(result)
         return res_down, res_up, res_err
 
@@ -199,9 +189,9 @@ if __name__ == "__main__":
         if string == 's':
             res_down, res_up, res_err = man.status()
             for x in res_down:
-                print(x['formatedstring'])
+                print(x)
             for x in res_up:
-                print(x['formatedstring'])
+                print(x)
         else:
             link = string[0:string.find(' ')]
             name = string[string.find(' ')+1:]
