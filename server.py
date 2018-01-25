@@ -66,7 +66,6 @@ def authGD():
 @auth.login_required
 def index():
     if request.method == 'POST':
-        print(request.form)
         name = request.form.get('name')
         link = request.form.get('link')
         upload = request.form.get('upload') == '1'
