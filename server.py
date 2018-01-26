@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import configparser
+import configparser, os
 from flask import Flask, render_template, flash, request, make_response, redirect, url_for
 from flask_httpauth import HTTPBasicAuth
 from transport import Manager
@@ -7,8 +7,9 @@ from django.core.validators import URLValidator
 from django.core.exceptions import ValidationError
 
 # App config.
+dir_path = os.path.dirname(os.path.realpath(__file__))
 config = configparser.ConfigParser()
-config.read('settings.ini')
+config.read(os.path.join(dir_path, 'settings.ini'))
 USERNAME = config['server']['USERNAME']
 PASSWORD = config['server']['PASSWORD']
 SERVER_PORT = int(config['server']['SERVER_PORT'])

@@ -14,20 +14,18 @@ class Flag:
     logging_level = 'ERROR'
 
 
+dir_path = os.path.dirname(os.path.realpath(__file__))
 config = configparser.ConfigParser()
-config.read('settings.ini')
+config.read(os.path.join(dir_path, 'settings.ini'))
 mime = MimeTypes()
 SCOPES = config['transport']['SCOPE']
-CLIENT_SECRET_FILE = config['transport']['CLIENT_SECRET_FILE']
-CREDENTIAL_FILE = config['transport']['CREDENTIAL_FILE']
+CLIENT_SECRET_FILE = os.path.join(dir_path, config['transport']['CLIENT_SECRET_FILE'])
+CREDENTIAL_FILE = os.path.join(dir_path, config['transport']['CREDENTIAL_FILE'])
 APPLICATION_NAME = config['transport']['APPLICATION_NAME']
 CHUNKSIZE = int(config['transport']['CHUNKSIZE']) * 1024**2
 RETRY = int(config['transport']['RETRY'])
 
 
-dir_path = os.path.dirname(os.path.realpath(__file__))
-CLIENT_SECRET_FILE = os.path.join(dir_path, CLIENT_SECRET_FILE)
-CREDENTIAL_FILE = os.path.join(dir_path, CREDENTIAL_FILE)
 
 
 class Manager(object):
