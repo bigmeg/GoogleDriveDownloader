@@ -26,8 +26,6 @@ CHUNKSIZE = int(config['transport']['CHUNKSIZE']) * 1024**2
 RETRY = int(config['transport']['RETRY'])
 
 
-
-
 class Manager(object):
     def __init__(self):
         self.store = oauth2client.file.Storage(CREDENTIAL_FILE)
@@ -62,10 +60,12 @@ class Manager(object):
                             os.remove(obj.dest)
                     else:
                         self.error_arr.append(obj)
+            time.sleep(0.66)
 
     def uploader(self):
         while True:
             if not self.auth_ready or len(self.upload_arr) == 0:
+                time.sleep(0.66)
                 continue
             obj = self.upload_arr[0]
             obj.status = "uploading"
