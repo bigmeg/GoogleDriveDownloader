@@ -15,7 +15,7 @@ PASSWORD = config['server']['PASSWORD']
 SERVER_PORT = int(config['server']['SERVER_PORT'])
 app = Flask(__name__)
 app.config.from_object(__name__)
-app.config['SECRET_KEY'] = 'B12r98j/3yX R~XHH!jmN]LWX/,?RT'
+app.config['SECRET_KEY'] = os.urandom(24)
 
 # Resources
 man = Manager()
@@ -86,10 +86,7 @@ def index():
                 flash('Error: All the form fields are required. ')
         return redirect(url_for('back'))
     res_down, res_up, res_err = man.status()
-    info = ''
-    for x in res_down: info += x + '\n'
-    for x in res_up: info += x + '\n'
-    for x in res_err: info += x + '\n'
+    info = '\n'.join(res_down + res_up + res_err)
 
     wb = ''
     if not man.auth_ready:
