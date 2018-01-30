@@ -1,53 +1,55 @@
 <html>
-    <head>
-        <title>GDrive Authentication Page</title>
-       <link rel="stylesheet" media="screen" href ="static/bootstrap.min.css">
-       <link rel="stylesheet" href="static/bootstrap-theme.min.css">
-       <meta name="viewport" content = "width=device-width, initial-scale=1.0">
+<head>
+    <title>GDrive Authentication Page</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"
+          integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm"
+          crossorigin="anonymous">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    </head>
-    <body>
+</head>
+<body>
 
 
 <div class="container">
 
 
-  <h2>Google Drive Downloader Authentication Page</h2>
-  <br>
-  <h3>Please visit this link to sign in your Google account and then fill in the returned code</h3>
-  <br>
-  <a href="{{ link|safe }}" target="_blank">Google Drive Authentication Link</a>
-  <br><br><br>
-  <form  action="" method="post" role="form">
-    <div class="form-group">
-      <label for="code">Code:</label>
-      <input type="text" class="form-control" id="code" name="code" placeholder="code from the sign in page">
+    <h2>Google Drive Downloader Authentication Page</h2>
+    <br>
+    <div class="alert alert-info">
+        Please visit this link to sign in your Google account and then fill in the returned code
+        <br><br>
+        <a href="{{ link|safe }}" target="_blank">Google Drive Authentication Link</a>
     </div>
-    <button type="submit" class="btn btn-success">Submit</button>
-  </form>
 
-  <br>
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
+    <br>
+    <form action="" method="post" role="form">
+        <div class="form-group">
+            <label for="code">Code:</label>
+            <input type="text" class="form-control" id="code" name="code" placeholder="code from the sign in page">
+        </div>
+        <button type="submit" class="btn btn-success">Submit</button>
+    </form>
 
-        {% for message in messages %}
-            {% if "Error" not in message[1]: %}
-                <div class="alert alert-info">
-                <strong>Success! </strong> {{ message[1] }}
-                </div>
-            {% endif %}
+    <br>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
 
-            {% if "Error" in message[1]: %}
-                <div class="alert alert-warning">
-                {{ message[1] }}
-                </div>
-            {% endif %}
-        {% endfor %}
-            {% endif %}
-        {% endwith %}
+            {% for message in messages %}
+                {% if "Error" not in message[1]: %}
+                    <div class="alert alert-info">
+                        <strong>Success! </strong> {{ message[1] }}
+                    </div>
+                {% endif %}
+
+                {% if "Error" in message[1]: %}
+                    <div class="alert alert-warning">
+                        {{ message[1] }}
+                    </div>
+                {% endif %}
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
 </div>
 <br>
-</div>
-</div>
 </body>
 </html>
