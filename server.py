@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import configparser, os
-from flask import Flask, render_template, flash, request, make_response, redirect, url_for
+from flask import Flask, render_template, flash, request, make_response, redirect, url_for, jsonify
 from flask_httpauth import HTTPBasicAuth
 from transport import Manager
 from django.core.validators import URLValidator
@@ -23,12 +23,9 @@ auth = HTTPBasicAuth()
 url_validator = URLValidator()
 last_auth_url = None
 
-
 @auth.get_password
 def get_password(username):
-    if username == USERNAME:
-        return PASSWORD
-    return None
+    return PASSWORD if username == USERNAME else None
 
 
 @auth.error_handler
@@ -55,7 +52,6 @@ def authGD():
             flash('Error: Please input code. ')
             return render_template('authGD.html', link=last_auth_url)
         if man.put_auth_code(code):
-            flash('Authentication Successful. ')
             return redirect(url_for('back'))
         else:
             flash('Error: Authentication Failed. ')
@@ -63,14 +59,17 @@ def authGD():
     return render_template('authGD.html', link=last_auth_url)
 
 
-@app.route("/", methods=['GET', 'POST'])
+@app.route("/api", methods=['GET', 'POST'])
 @auth.login_required
-def index():
+def api():
     if request.method == 'POST':
-        name = request.form.get('name')
-        link = request.form.get('link')
-        upload = request.form.get('upload') == '1'
-        delete = request.form.get('delete') == '1'
+        if not request.is_json:
+            return jsonify({'result': 'not json!? come on!'})
+        data = request.get_json()
+        name = data.get('name')
+        link = data.get('link')
+        upload = data.get('upload')
+        delete = data.get('delete')
         try:
             url_validator(link)
             valid_link = True
@@ -78,21 +77,25 @@ def index():
             valid_link = False
         if name != '' and valid_link:
             man.add_new_task(link, name, upload=upload, delete=delete)
-            flash('Add new task succeed ' + name)
+            return jsonify({'result': 'success'})
         else:
             if name != '' and link != '' and not valid_link:
-                flash('Error: Link is not valid. ')
+                return jsonify({'result': 'invalid link'})
             else:
-                flash('Error: All the form fields are required. ')
-        return redirect(url_for('back'))
-    res_down, res_up, res_err = man.status()
-    info = '\n'.join(res_down + res_up + res_err)
+                return jsonify({'result': 'missing parameter'})
+    elif request.method == 'GET':
+        res_down, res_up, res_err = man.status()
+        return jsonify({'download': res_down, 'upload': res_up, 'error': res_err})
 
+
+@app.route("/", methods=['GET', 'POST'])
+@auth.login_required
+def index():
     wb = ''
     if not man.auth_ready:
         wb = "<br><div class=\"alert alert-danger\">"
         wb += "<a href=\"/authGD\">Authentication Required with Google Drive</a></div>"
-    return render_template('GDD.html', GDDstatus=info.replace('\n', '<br>'), WarningBar=wb)
+    return render_template('GDD.html', WarningBar=wb)
 
 
 if __name__ == "__main__":

@@ -44,7 +44,7 @@ class Manager(object):
                     self.download_arr.remove(obj)
                     if obj.isSuccessful():
                         if obj.upload:
-                            obj.status = 'waiting for upload'
+                            obj.status = 'waiting to upload'
                             self.upload_arr.append(obj)
                         elif obj.delete:
                             os.remove(obj.dest)
@@ -79,6 +79,8 @@ class Manager(object):
                             obj.status = "uploading retrying at " + retry
                         if status:
                             status.speed = '%.1f' % (CHUNKSIZE / 1024**2 / time_elapsed) + 'MB/s'
+                            left = status.total_size - status.resumable_progress
+                            status.eta = utils.time_human(int(left / (CHUNKSIZE / time_elapsed)))
                             obj.up_status = status
                     break
                 except HttpError as e:
@@ -91,11 +93,13 @@ class Manager(object):
                         continue
                     else:
                         obj.errors.append(e)
+                        obj.status = "upload error"
                         self.error_arr.append(obj)
                         fail = True
                         break
                 except Exception as e:
                     obj.errors.append(e)
+                    obj.status = "upload error"
                     self.error_arr.append(obj)
                     fail = True
                     break
@@ -106,46 +110,54 @@ class Manager(object):
 
     def reporter(self):
         while True:
-            time.sleep(1)
+            time.sleep(0.66)
             res_down_temp, res_up_temp, res_err_temp = [], [], []
             for obj in self.download_arr:
-                res_down_temp.append(obj.filename + " : " +
-                                     obj.get_dl_size(human=True) + " / " +
-                                     utils.sizeof_human(obj.filesize) + " @ " +
-                                     obj.get_speed(human=True) +
-                                     " [" + '%.1f' % (obj.get_progress()*100) + "%, " + obj.get_eta(human=True) + "]")
+                value = {
+                    "filename": obj.filename,
+                    "status": obj.status,
+                    "download_size": obj.get_dl_size(human=True),
+                    "file_size": utils.sizeof_human(obj.filesize),
+                    "speed": obj.get_speed(human=True),
+                    "progress": obj.get_progress(),
+                    "eta": obj.get_eta(human=True)
+                }
+                res_down_temp.append(value)
             for obj in self.upload_arr:
-                result = obj.filename + " : " + obj.status
-                if obj.status == 'uploading':
-                    if not hasattr(obj, 'up_status'):
-                        result += " but is updating information"
-                    else:
-                        result += " at %d%%" % int(obj.up_status.progress() * 100)
-                        result += " @ " + obj.up_status.speed
-                        result += " of " + utils.sizeof_human(obj.up_status.total_size)
-                res_up_temp.append(result)
+                up_status = obj.up_status if hasattr(obj, 'up_status') else None
+                value = {
+                    "filename": obj.filename,
+                    "upload_size": utils.sizeof_human(up_status.resumable_progress) if up_status else 0,
+                    "status": obj.status,
+                    "progress": up_status.progress() if up_status else 0,
+                    "speed": up_status.speed if up_status else 0,
+                    "file_size": utils.sizeof_human(obj.filesize),
+                    "eta": up_status.eta if up_status else 0
+                }
+                res_up_temp.append(value)
             for obj in self.error_arr:
-                result = obj.filename + " : " + obj.status + '\n'
-                for e in obj.get_errors():
-                    result += str(e) + '\n'
-                res_err_temp.append(result)
+                value = {
+                    "filename": obj.filename,
+                    "status": obj.status,
+                    "errors": [str(err) for err in obj.get_errors()]
+                }
+                res_err_temp.append(value)
             self.res_down, self.res_up, self.res_err = res_down_temp, res_up_temp, res_err_temp
 
     def add_new_task(self, url, filename, upload=True, delete=True):
-        dest = os.path.expanduser('~/Downloads/' + filename)
-        obj = SmartDL(url, dest=dest, progress_bar=False, threads=1)
-        obj.filename = filename
-        obj.upload = upload
-        obj.delete = delete
-
-        def add_new_task_non_block():
+        def add_new_task_non_block(_url, _filename, _upload, _delete):
+            dest = os.path.expanduser('~/Downloads/' + _filename)
+            obj = SmartDL(_url, dest=dest, progress_bar=False, threads=1)
+            obj.filename = _filename
+            obj.upload = _upload
+            obj.delete = _delete
             try:
                 obj.start(blocking=False)
                 self.download_arr.append(obj)
             except Exception as e:
                 obj.errors.append(e)
                 self.error_arr.append(obj)
-        threading.Thread(target=add_new_task_non_block).start()
+        threading.Thread(target=add_new_task_non_block, args=(url, filename, upload, delete)).start()
 
     def get_auth_url(self):
         flow = client.flow_from_clientsecrets(CLIENT_SECRET_FILE, SCOPES)
