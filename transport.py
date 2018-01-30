@@ -147,7 +147,7 @@ class Manager(object):
     def add_new_task(self, url, filename, upload=True, delete=True):
         def add_new_task_non_block(_url, _filename, _upload, _delete):
             dest = os.path.expanduser('~/Downloads/' + _filename)
-            obj = SmartDL(_url, dest=dest, progress_bar=False, threads=1)
+            obj = SmartDL(_url, dest=dest, progress_bar=False, threads=1, fix_urls=False)
             obj.filename = _filename
             obj.upload = _upload
             obj.delete = _delete
@@ -190,10 +190,7 @@ if __name__ == "__main__":
         string = input("Please specify command: s(status) or [link name]").strip()
         if string == 's':
             res_down, res_up, res_err = man.status()
-            for x in res_down:
-                print(x)
-            for x in res_up:
-                print(x)
+            print(res_down, res_up, res_err)
         else:
             link = string[0:string.find(' ')]
             name = string[string.find(' ')+1:]

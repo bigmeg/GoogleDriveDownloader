@@ -23,6 +23,7 @@ auth = HTTPBasicAuth()
 url_validator = URLValidator()
 last_auth_url = None
 
+
 @auth.get_password
 def get_password(username):
     return PASSWORD if username == USERNAME else None
@@ -88,7 +89,7 @@ def api():
         return jsonify({'download': res_down, 'upload': res_up, 'error': res_err})
 
 
-@app.route("/", methods=['GET', 'POST'])
+@app.route("/", methods=['GET'])
 @auth.login_required
 def index():
     wb = ''
