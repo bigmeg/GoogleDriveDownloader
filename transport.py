@@ -1,5 +1,5 @@
 import os, threading, time, configparser
-from pySmartDL import SmartDL, utils
+import aria2_wrapper
 from googleapiclient.errors import HttpError
 from apiclient import discovery
 import oauth2client
@@ -24,10 +24,11 @@ CREDENTIAL_FILE = os.path.join(dir_path, config['transport']['CREDENTIAL_FILE'])
 APPLICATION_NAME = config['transport']['APPLICATION_NAME']
 CHUNKSIZE = int(config['transport']['CHUNKSIZE']) * 1024**2
 RETRY = int(config['transport']['RETRY'])
-
+REFRESH_INTERVAL = int(config['transport']['REFRESH_INTERVAL'])
 
 class Manager(object):
     def __init__(self):
+        self.aria2_man = aria2_wrapper.PyAria2Manager(refresh_interval=REFRESH_INTERVAL)
         self.store = oauth2client.file.Storage(CREDENTIAL_FILE)
         self.credentials = self.store.get()
         self.auth_ready = self.credentials and not self.credentials.invalid
@@ -50,12 +51,12 @@ class Manager(object):
                             os.remove(obj.dest)
                     else:
                         self.error_arr.append(obj)
-            time.sleep(0.66)
+            time.sleep(REFRESH_INTERVAL)
 
     def uploader(self):
         while True:
             if not self.auth_ready or len(self.upload_arr) == 0:
-                time.sleep(0.66)
+                time.sleep(REFRESH_INTERVAL)
                 continue
             obj = self.upload_arr[0]
             obj.status = "uploading"
@@ -78,10 +79,9 @@ class Manager(object):
                         if retry > 0:
                             obj.status = "uploading retrying at " + retry
                         if status:
-                            status.speed = '%.1f' % (CHUNKSIZE / 1024**2 / time_elapsed) + 'MB/s'
-                            left = status.total_size - status.resumable_progress
-                            status.eta = utils.time_human(int(left / (CHUNKSIZE / time_elapsed)))
-                            obj.up_status = status
+                            obj.speed = int(CHUNKSIZE / time_elapsed)
+                            obj.completed_size = status.resumable_progress
+                            obj.eta = int((status.total_size - status.resumable_progress) / (CHUNKSIZE / time_elapsed))
                     break
                 except HttpError as e:
                     if e.resp.status in [404]:
@@ -110,54 +110,39 @@ class Manager(object):
 
     def reporter(self):
         while True:
-            time.sleep(0.66)
+            time.sleep(REFRESH_INTERVAL)
             res_down_temp, res_up_temp, res_err_temp = [], [], []
-            for obj in self.download_arr:
-                value = {
-                    "filename": obj.filename,
-                    "status": obj.status,
-                    "download_size": obj.get_dl_size(human=True),
-                    "file_size": utils.sizeof_human(obj.filesize),
-                    "speed": obj.get_speed(human=True),
-                    "progress": obj.get_progress(),
-                    "eta": obj.get_eta(human=True)
-                }
-                res_down_temp.append(value)
-            for obj in self.upload_arr:
-                up_status = obj.up_status if hasattr(obj, 'up_status') else None
-                value = {
-                    "filename": obj.filename,
-                    "upload_size": utils.sizeof_human(up_status.resumable_progress) if up_status else 0,
-                    "status": obj.status,
-                    "progress": up_status.progress() if up_status else 0,
-                    "speed": up_status.speed if up_status else 0,
-                    "file_size": utils.sizeof_human(obj.filesize),
-                    "eta": up_status.eta if up_status else 0
-                }
-                res_up_temp.append(value)
+
+            def info_dumper(source, dump_to):
+                for obj in source:
+                    value = {"filename": obj.get_filename(),
+                             "status": obj.get_status(),
+                             "completed_size": obj.get_completed_size(),
+                             "file_size": obj.get_file_size(),
+                             "speed": obj.get_speed(),
+                             "progress": obj.get_progress(),
+                             "eta": obj.get_eta()}
+                    dump_to.append(value)
+            info_dumper(self.download_arr, res_down_temp)
+            info_dumper(self.upload_arr, res_up_temp)
             for obj in self.error_arr:
-                value = {
-                    "filename": obj.filename,
-                    "status": obj.status,
-                    "errors": [str(err) for err in obj.get_errors()]
-                }
+                value = {"filename": obj.filename,
+                         "status": obj.status,
+                         "errors": [str(err) for err in obj.get_errors()]}
                 res_err_temp.append(value)
             self.res_down, self.res_up, self.res_err = res_down_temp, res_up_temp, res_err_temp
 
     def add_new_task(self, url, filename, upload=True, delete=True):
-        def add_new_task_non_block(_url, _filename, _upload, _delete):
-            dest = os.path.expanduser('~/Downloads/' + _filename)
-            obj = SmartDL(_url, dest=dest, progress_bar=False, threads=1, fix_urls=False)
-            obj.filename = _filename
-            obj.upload = _upload
-            obj.delete = _delete
-            try:
-                obj.start(blocking=False)
-                self.download_arr.append(obj)
-            except Exception as e:
-                obj.errors.append(e)
-                self.error_arr.append(obj)
-        threading.Thread(target=add_new_task_non_block, args=(url, filename, upload, delete)).start()
+        dest_folder = os.path.expanduser('~/Downloads/')
+        obj = self.aria2_man.new_task(url, dest_folder, filename)
+        obj.upload = upload
+        obj.delete = delete
+        try:
+            obj.start()
+            self.download_arr.append(obj)
+        except Exception as e:
+            obj.errors.append(e)
+            self.error_arr.append(obj)
 
     def get_auth_url(self):
         flow = client.flow_from_clientsecrets(CLIENT_SECRET_FILE, SCOPES)

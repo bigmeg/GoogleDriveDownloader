@@ -14,27 +14,26 @@ function getContent() {
     xhr.send();
 }
 
+
 function renderContent(data) {
     var download = data.download;
     var upload = data.upload;
     var error = data.error;
 
     var htmlString = '';
+    var producer = function (rs) {
+        return rs.status + " " + rs.filename + " : " + rs.completed_size + " / " + rs.file_size + " @ " + rs.speed +
+            " [" + Math.round(rs.progress * 1000) / 10 + "%, " + rs.eta + "]" + "</a>";
+    }
 
     for (var i = 0; i < download.length; i++) {
         var rs = download[i];
-        htmlString += "<a class=\"list-group-item list-group-item-action list-group-item-info\">" +
-            rs.status + " " + rs.filename + " : " + rs.download_size + " / " + rs.file_size + " @ " + rs.speed +
-            " [" + Math.round(rs.progress * 1000) / 10 + "%, " + rs.eta + "]" +
-            "</a>";
+        htmlString += "<a class=\"list-group-item list-group-item-action list-group-item-info\">" + producer(rs);
     }
 
     for (var i = 0; i < upload.length; i++) {
         var rs = upload[i];
-        htmlString += "<a class=\"list-group-item list-group-item-action list-group-item-success\">" +
-            rs.status + " " + rs.filename + " : " + rs.upload_size + " / " + rs.file_size + " @ " + rs.speed +
-            " [" + Math.round(rs.progress * 1000) / 10 + "%, " + rs.eta + "]" +
-            "</a>";
+        htmlString += "<a class=\"list-group-item list-group-item-action list-group-item-success\">" + producer(rs);
     }
 
     for (var i = 0; i < error.length; i++) {
