@@ -26,9 +26,10 @@ CHUNKSIZE = int(config['transport']['CHUNKSIZE']) * 1024**2
 RETRY = int(config['transport']['RETRY'])
 REFRESH_INTERVAL = int(config['transport']['REFRESH_INTERVAL'])
 
+
 class Manager(object):
     def __init__(self):
-        self.aria2_man = aria2_wrapper.PyAria2Manager(refresh_interval=REFRESH_INTERVAL)
+        self.aria2_man = aria2_wrapper.PyAria2Initializer(refresh_interval=REFRESH_INTERVAL)
         self.store = oauth2client.file.Storage(CREDENTIAL_FILE)
         self.credentials = self.store.get()
         self.auth_ready = self.credentials and not self.credentials.invalid
@@ -112,19 +113,10 @@ class Manager(object):
         while True:
             time.sleep(REFRESH_INTERVAL)
             res_down_temp, res_up_temp, res_err_temp = [], [], []
-
-            def info_dumper(source, dump_to):
-                for obj in source:
-                    value = {"filename": obj.get_filename(),
-                             "status": obj.get_status(),
-                             "completed_size": obj.get_completed_size(),
-                             "file_size": obj.get_file_size(),
-                             "speed": obj.get_speed(),
-                             "progress": obj.get_progress(),
-                             "eta": obj.get_eta()}
-                    dump_to.append(value)
-            info_dumper(self.download_arr, res_down_temp)
-            info_dumper(self.upload_arr, res_up_temp)
+            for obj in self.download_arr:
+                res_down_temp.append(obj.get_summary_dict())
+            for obj in self.upload_arr:
+                res_up_temp.append(obj.get_summary_dict())
             for obj in self.error_arr:
                 value = {"filename": obj.filename,
                          "status": obj.status,

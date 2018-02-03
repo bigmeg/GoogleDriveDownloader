@@ -6,59 +6,20 @@ import threading
 from utils import time_human, sizeof_human
 
 
-class PyAria2Manager(object):
+class PyAria2Initializer(object):
     def __init__(self, host='localhost', port=6800, refresh_interval=1):
+        self.port = port
+        self.host = host
+        self.refresh_interval = refresh_interval
         if not self._isAria2Installed():
             raise Exception('aria2 is not installed, please install it before.')
-
-        if not self._isAria2rpcRunning():
-            cmd = 'aria2c --enable-rpc --max-concurrent-downloads=10 --rpc-listen-port %d' % port
-            subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
-            count = 0
-            while not self._isAria2rpcRunning():
-                count += 1
-                time.sleep(3)
-                if count == 5:
-                    raise Exception('aria2 RPC server started failure.')
-
+        if not self._isAria2rpcRunning() and not self._startAria2rpc():
+            raise Exception('aria2 is cannot be started.')
         self.server = xmlrpc.client.ServerProxy('http://%s:%d/rpc' % (host, port))
-        self.task = []
         self.lock = threading.Lock()
-        threading.Thread(target=self.__task_tracker, daemon=True, args=[refresh_interval]).start()
-
-    def __task_tracker(self, refresh_interval=1):
-        while True:
-            for task in self.task:
-                try:
-                    with self.lock:
-                        response = self.server.aria2.tellStatus(task.gid)
-                    task.status = response['status']
-                    task.speed = int(response['downloadSpeed'])
-                    task.completed_size = int(response['files'][0]['completedLength'])
-                    task.file_size = int(response['files'][0]['length'])
-                    task.dest = response['files'][0]['path']
-                    task.progress = task.completed_size / task.file_size
-                    task.eta = int((task.file_size - task.completed_size) / task.speed) if task.speed > 0 else 0
-                    if task.status in ['complete', 'error']:
-                        self.task.remove(task)
-                    if task.status == 'error':
-                        task.errors.append(response.get('errorMessage', 'NoErrorMessageFetched'))
-                except Exception as e:
-                    print(e)
-            time.sleep(refresh_interval)
 
     def new_task(self, url, dest_folder, filename):
-        return PyAria2Task(url, dest_folder, filename, self)
-
-    def _register_task(self, task):
-        with self.lock:
-            task.gid = self.server.aria2.addUri([task.url],
-                                                {'dir': task.dest_folder,
-                                                 'out': task.filename,
-                                                 'auto-file-renaming': 'false',
-                                                 'allow-overwrite': 'true'})
-        task.status = 'started'
-        self.task.append(task)
+        return PyAria2Task(url, dest_folder, filename, self.lock, self.server, self.refresh_interval)
 
     def _isAria2Installed(self):
         for cmdpath in os.environ['PATH'].split(':'):
@@ -70,13 +31,26 @@ class PyAria2Manager(object):
         pgrep_process = subprocess.Popen('pgrep -l aria2', shell=True, stdout=subprocess.PIPE)
         return pgrep_process.stdout.readline() != b''
 
+    def _startAria2rpc(self):
+        cmd = 'aria2c --enable-rpc --max-concurrent-downloads=10 --rpc-listen-port %d' % self.port
+        subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
+        count = 0
+        while not self._isAria2rpcRunning():
+            count += 1
+            if count == 5:
+                return False
+            time.sleep(3)
+        return True
+
 
 class PyAria2Task(object):
-    def __init__(self, url, dest_folder, filename, manager):
-        self.dest_folder = dest_folder
+    def __init__(self, url, dest_folder, filename, lock, server, refresh_interval):
         self.url = url
+        self.dest_folder = dest_folder
         self.filename = filename
-        self.manager = manager
+        self.lock = lock
+        self.server = server
+        self.refresh_interval = refresh_interval
         self.status = 'created'
         self.speed = 0
         self.completed_size = 0
@@ -87,19 +61,41 @@ class PyAria2Task(object):
         self.dest = ''
         self.errors = []
 
-    def start(self, blocking=False, status_bar=False):
+    def start(self, blocking=False):
         if self.status != 'created':
-            pass
-        try:
-            self.manager._register_task(self)
-            while blocking and self.status not in ['complete', 'error']:
-                if status_bar:
-                    print(self.filename, self.status, self.speed, self.file_size, self.progress, self.eta)
-                time.sleep(1)
-        except Exception as e:
-            self.errors.append(e)
+            return
+        with self.lock:
+            self.gid = self.server.aria2.addUri([self.url],
+                                                {'dir': self.dest_folder,
+                                                 'out': self.filename,
+                                                 'auto-file-renaming': 'false',
+                                                 'allow-overwrite': 'true'})
+        self.status = 'started'
+        if blocking:
+            self.__updater()
+        else:
+            threading.Thread(target=self.__updater, daemon=True).start()
 
-    def isFinished(self): return self.status in ['complete', 'error']
+    def __updater(self):
+        while self.status not in ['complete', 'error']:
+            try:
+                with self.lock:
+                    response = self.server.aria2.tellStatus(self.gid)
+            except ConnectionRefusedError or OSError as e:
+                self.status = str(e) + ' aria2 may be down.'
+                raise e
+            self.status = response['status']
+            self.speed = int(response['downloadSpeed'])
+            self.completed_size = int(response['files'][0]['completedLength'])
+            self.file_size = int(response['files'][0]['length'])
+            self.dest = response['files'][0]['path']
+            self.progress = (self.completed_size / self.file_size) if self.file_size > 0 else 0
+            self.eta = int((self.file_size - self.completed_size) / self.speed) if self.speed > 0 else 0
+            if self.status == 'error':
+                self.errors.append(response.get('errorMessage', 'NoErrorMessageFetched'))
+            time.sleep(self.refresh_interval)
+
+    def isFinished(self): return self.status not in ['created', 'started', 'active', 'waiting']
 
     def isSuccessful(self): return self.status == 'complete'
 
@@ -121,7 +117,11 @@ class PyAria2Task(object):
 
     def get_errors(self): return self.errors
 
-
-
-
-
+    def get_summary_dict(self):
+        return {"filename": self.filename,
+                "status": self.status,
+                "completed_size": self.get_completed_size(),
+                "file_size": self.get_file_size(),
+                "speed": self.get_speed(),
+                "progress": self.get_progress(),
+                "eta": self.get_eta()}
