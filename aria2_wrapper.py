@@ -59,6 +59,7 @@ class PyAria2Task(object):
         self.progress = 0
         self.eta = 0
         self.dest = ''
+        self.last_updated_timestamp = time.strftime('%a, %d %b %Y %H:%M:%S GMT', time.gmtime())
         self.errors = []
 
     def start(self, blocking=False):
@@ -91,6 +92,7 @@ class PyAria2Task(object):
             self.dest = response['files'][0]['path']
             self.progress = (self.completed_size / self.file_size) if self.file_size > 0 else 0
             self.eta = int((self.file_size - self.completed_size) / self.speed) if self.speed > 0 else 0
+            self.last_updated_timestamp = time.strftime('%a, %d %b %Y %H:%M:%S GMT', time.gmtime())
             if self.status == 'error':
                 self.errors.append(response.get('errorMessage', 'NoErrorMessageFetched'))
             time.sleep(self.refresh_interval)
@@ -115,6 +117,8 @@ class PyAria2Task(object):
 
     def get_dest(self): return self.dest
 
+    def get_last_updated_timestamp(self): return self.last_updated_timestamp
+
     def get_errors(self): return self.errors
 
     def get_summary_dict(self):
@@ -124,4 +128,5 @@ class PyAria2Task(object):
                 "file_size": self.get_file_size(),
                 "speed": self.get_speed(),
                 "progress": self.get_progress(),
-                "eta": self.get_eta()}
+                "eta": self.get_eta(),
+                "time": self.last_updated_timestamp}

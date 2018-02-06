@@ -23,7 +23,7 @@ function renderContent(data) {
     var htmlString = '';
     var producer = function (rs) {
         return rs.status + " " + rs.filename + " : " + rs.completed_size + " / " + rs.file_size + " @ " + rs.speed +
-            " [" + Math.round(rs.progress * 1000) / 10 + "%, " + rs.eta + "]" + "</a>";
+            " [" + Math.round(rs.progress * 1000) / 10 + "%, " + rs.eta + "]<br>" + rs.time + "</a>";
     }
 
     for (var i = 0; i < download.length; i++) {
@@ -43,7 +43,7 @@ function renderContent(data) {
         for (var ii = 0; ii < rs.errors.length; ii++) {
             htmlString += "  " + rs.errors[ii] + "<br>";
         }
-        htmlString += "</a>";
+        htmlString += rs.time + "</a>";
     }
     document.getElementById("status").innerHTML = htmlString;
 }

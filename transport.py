@@ -80,9 +80,11 @@ class Manager(object):
                         if retry > 0:
                             obj.status = "uploading retrying at " + retry
                         if status:
+                            obj.progress = status.resumable_progress / status.total_size
                             obj.speed = int(CHUNKSIZE / time_elapsed)
                             obj.completed_size = status.resumable_progress
                             obj.eta = int((status.total_size - status.resumable_progress) / (CHUNKSIZE / time_elapsed))
+                            obj.last_updated_timestamp = time.strftime('%a, %d %b %Y %H:%M:%S GMT', time.gmtime())
                     break
                 except HttpError as e:
                     if e.resp.status in [404]:
@@ -95,12 +97,14 @@ class Manager(object):
                     else:
                         obj.errors.append(e)
                         obj.status = "upload error"
+                        obj.last_updated_timestamp = time.strftime('%a, %d %b %Y %H:%M:%S GMT', time.gmtime())
                         self.error_arr.append(obj)
                         fail = True
                         break
                 except Exception as e:
                     obj.errors.append(e)
                     obj.status = "upload error"
+                    obj.last_updated_timestamp = time.strftime('%a, %d %b %Y %H:%M:%S GMT', time.gmtime())
                     self.error_arr.append(obj)
                     fail = True
                     break
@@ -120,7 +124,8 @@ class Manager(object):
             for obj in self.error_arr:
                 value = {"filename": obj.filename,
                          "status": obj.status,
-                         "errors": [str(err) for err in obj.get_errors()]}
+                         "errors": [str(err) for err in obj.get_errors()],
+                         "time": obj.last_updated_timestamp}
                 res_err_temp.append(value)
             self.res_down, self.res_up, self.res_err = res_down_temp, res_up_temp, res_err_temp
 
