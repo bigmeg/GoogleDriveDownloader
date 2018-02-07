@@ -1,5 +1,5 @@
 import os, threading, time, configparser
-import aria2_wrapper
+from download import SmartDL
 from googleapiclient.errors import HttpError
 from apiclient import discovery
 import oauth2client
@@ -7,11 +7,7 @@ from googleapiclient.http import MediaFileUpload
 from oauth2client import client
 import httplib2
 from mimetypes import MimeTypes
-
-
-class Flag:
-    noauth_local_webserver = True
-    logging_level = 'ERROR'
+import utils
 
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -29,7 +25,6 @@ REFRESH_INTERVAL = int(config['transport']['REFRESH_INTERVAL'])
 
 class Manager(object):
     def __init__(self):
-        self.aria2_man = aria2_wrapper.PyAria2Initializer(refresh_interval=REFRESH_INTERVAL)
         self.store = oauth2client.file.Storage(CREDENTIAL_FILE)
         self.credentials = self.store.get()
         self.auth_ready = self.credentials and not self.credentials.invalid
@@ -47,6 +42,10 @@ class Manager(object):
                     if obj.isSuccessful():
                         if obj.upload:
                             obj.status = 'waiting to upload'
+                            obj.speed = 0
+                            obj.progress = 0
+                            obj.completed_size = 0
+                            obj.eta = 0
                             self.upload_arr.append(obj)
                         elif obj.delete:
                             os.remove(obj.dest)
@@ -63,12 +62,9 @@ class Manager(object):
             obj.status = "uploading"
 
             service = discovery.build('drive', 'v3', http=self.credentials.authorize(httplib2.Http()))
-            media = MediaFileUpload(obj.dest,
-                                    mimetype=mime.guess_type(os.path.basename(obj.dest))[0],
-                                    chunksize=CHUNKSIZE,
-                                    resumable=True)
-            request = service.files().create(body={'name': os.path.basename(obj.dest)},
-                                             media_body=media)
+            media = MediaFileUpload(obj.dest, mimetype=mime.guess_type(obj.filename)[0],
+                                    chunksize=CHUNKSIZE, resumable=True)
+            request = service.files().create(body={'name': obj.filename}, media_body=media)
             response = None
             fail = False
             for retry in range(RETRY):
@@ -84,27 +80,23 @@ class Manager(object):
                             obj.speed = int(CHUNKSIZE / time_elapsed)
                             obj.completed_size = status.resumable_progress
                             obj.eta = int((status.total_size - status.resumable_progress) / (CHUNKSIZE / time_elapsed))
-                            obj.last_updated_timestamp = time.strftime('%a, %d %b %Y %H:%M:%S GMT', time.gmtime())
                     break
                 except HttpError as e:
                     if e.resp.status in [404]:
                         service = discovery.build('drive', 'v3', http=self.credentials.authorize(httplib2.Http()))
-                        request = service.files().create(body={'name': os.path.basename(obj.dest)},
-                                                         media_body=media)
+                        request = service.files().create(body={'name': obj.filename}, media_body=media)
                         response = None
                     elif e.resp.status in [500, 502, 503, 504]:
                         continue
                     else:
                         obj.errors.append(e)
                         obj.status = "upload error"
-                        obj.last_updated_timestamp = time.strftime('%a, %d %b %Y %H:%M:%S GMT', time.gmtime())
                         self.error_arr.append(obj)
                         fail = True
                         break
                 except Exception as e:
                     obj.errors.append(e)
                     obj.status = "upload error"
-                    obj.last_updated_timestamp = time.strftime('%a, %d %b %Y %H:%M:%S GMT', time.gmtime())
                     self.error_arr.append(obj)
                     fail = True
                     break
@@ -120,26 +112,32 @@ class Manager(object):
             for obj in self.download_arr:
                 res_down_temp.append(obj.get_summary_dict())
             for obj in self.upload_arr:
-                res_up_temp.append(obj.get_summary_dict())
+                res_up_temp.append({"filename": obj.filename,
+                                    "status": obj.status,
+                                    "completed_size": utils.sizeof_human(obj.completed_size),
+                                    "file_size": utils.sizeof_human(obj.filesize),
+                                    "speed": "%s/s" % utils.sizeof_human(obj.speed),
+                                    "progress": obj.progress,
+                                    "eta": utils.time_human(obj.eta)})
             for obj in self.error_arr:
-                value = {"filename": obj.filename,
-                         "status": obj.status,
-                         "errors": [str(err) for err in obj.get_errors()],
-                         "time": obj.last_updated_timestamp}
-                res_err_temp.append(value)
+                res_err_temp.append({"filename": obj.filename,
+                                     "status": obj.status,
+                                     "errors": [str(err) for err in obj.get_errors()]})
             self.res_down, self.res_up, self.res_err = res_down_temp, res_up_temp, res_err_temp
 
     def add_new_task(self, url, filename, upload=True, delete=True):
-        dest_folder = os.path.expanduser('~/Downloads/')
-        obj = self.aria2_man.new_task(url, dest_folder, filename)
-        obj.upload = upload
-        obj.delete = delete
-        try:
-            obj.start()
-            self.download_arr.append(obj)
-        except Exception as e:
-            obj.errors.append(e)
-            self.error_arr.append(obj)
+        def add_new_task_non_block():
+            dest = os.path.expanduser('~/Downloads/' + filename)
+            obj = SmartDL(url, dest=dest, progress_bar=False, threads=1)
+            obj.upload = upload
+            obj.delete = delete
+            try:
+                obj.start(blocking=False)
+                self.download_arr.append(obj)
+            except Exception as e:
+                obj.errors.append(e)
+                self.error_arr.append(obj)
+        threading.Thread(target=add_new_task_non_block).start()
 
     def get_auth_url(self):
         flow = client.flow_from_clientsecrets(CLIENT_SECRET_FILE, SCOPES)
@@ -150,12 +148,11 @@ class Manager(object):
 
     def put_auth_code(self, code):
         try:
-            credential = self.flow.step2_exchange(code)
+            self.credentials = self.flow.step2_exchange(code)
         except client.FlowExchangeError:
             return False
-        self.store.put(credential)
-        credential.set_store(self.store)
-        self.credentials = credential
+        self.store.put(self.credentials)
+        self.credentials.set_store(self.store)
         self.auth_ready = True
         return True
 

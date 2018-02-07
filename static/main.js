@@ -23,7 +23,7 @@ function renderContent(data) {
     var htmlString = '';
     var producer = function (rs) {
         return rs.status + " " + rs.filename + " : " + rs.completed_size + " / " + rs.file_size + " @ " + rs.speed +
-            " [" + Math.round(rs.progress * 1000) / 10 + "%, " + rs.eta + "]<br>" + rs.time + "</a>";
+            " [" + Math.round(rs.progress * 1000) / 10 + "%, " + rs.eta + "]</a>";
     }
 
     for (var i = 0; i < download.length; i++) {
@@ -41,9 +41,9 @@ function renderContent(data) {
         htmlString += "<a class=\"list-group-item list-group-item-action list-group-item-danger\">" +
             rs.filename + " " + rs.status + " : <br>";
         for (var ii = 0; ii < rs.errors.length; ii++) {
-            htmlString += "  " + rs.errors[ii] + "<br>";
+            htmlString += "\t" + rs.errors[ii] + "<br>";
         }
-        htmlString += rs.time + "</a>";
+        htmlString += "</a>";
     }
     document.getElementById("status").innerHTML = htmlString;
 }
