@@ -1,18 +1,11 @@
 var alertContainer = document.getElementById("alert-info");
 var btn = document.getElementById("btn");
 
-getContent();
-setInterval(getContent, 1000);
+var socket = io.connect('http://' + document.domain + ':' + location.port + '/api');
+socket.on('newdata', function (msg) {
+    renderContent(msg);
+});
 
-function getContent() {
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', '/api');
-    xhr.onload = function () {
-        var data = JSON.parse(xhr.responseText);
-        renderContent(data);
-    }
-    xhr.send();
-}
 
 
 function renderContent(data) {

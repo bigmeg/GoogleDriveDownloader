@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
+import eventlet
+eventlet.monkey_patch()
+
 import configparser, os
 from flask import Flask, render_template, flash, request, make_response, redirect, url_for, jsonify
 from flask_httpauth import HTTPBasicAuth
+from flask_socketio import SocketIO, send, emit
 from transport import Manager
 from django.core.validators import URLValidator
 from django.core.exceptions import ValidationError
@@ -13,15 +17,19 @@ config.read(os.path.join(dir_path, 'settings.ini'))
 USERNAME = config['server']['USERNAME']
 PASSWORD = config['server']['PASSWORD']
 SERVER_PORT = int(config['server']['SERVER_PORT'])
+REFRESH_INTERVAL = int(config['transport']['REFRESH_INTERVAL'])
+
 app = Flask(__name__)
 app.config.from_object(__name__)
 app.config['SECRET_KEY'] = os.urandom(24)
+socketio = SocketIO(app)
 
 # Resources
 man = Manager()
 auth = HTTPBasicAuth()
 url_validator = URLValidator()
 last_auth_url = None
+thread = None
 
 
 @auth.get_password
@@ -99,5 +107,20 @@ def index():
     return render_template('GDD.html', WarningBar=wb)
 
 
+@socketio.on('connect', namespace='/api')
+@auth.login_required
+def connect():
+    print('client connect')
+    global thread
+    if thread is None:
+        def background_thread():
+            while True:
+                res_down, res_up, res_err = man.status()
+                content = {'download': res_down, 'upload': res_up, 'error': res_err}
+                socketio.emit('newdata', content, namespace='/api')
+                socketio.sleep(REFRESH_INTERVAL)
+        thread = socketio.start_background_task(target=background_thread)
+
+
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=SERVER_PORT)
+    socketio.run(app, host='0.0.0.0', port=SERVER_PORT)
