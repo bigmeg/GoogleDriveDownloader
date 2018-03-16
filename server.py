@@ -20,8 +20,8 @@ SERVER_PORT = int(config['server']['SERVER_PORT'])
 REFRESH_INTERVAL = int(config['transport']['REFRESH_INTERVAL'])
 
 app = Flask(__name__)
-app.config.from_object(__name__)
 app.config['SECRET_KEY'] = os.urandom(24)
+app.config['DEBUG'] = True
 socketio = SocketIO(app)
 
 # Resources
@@ -29,7 +29,6 @@ man = Manager()
 auth = HTTPBasicAuth()
 url_validator = URLValidator()
 last_auth_url = None
-thread = None
 
 
 @auth.get_password
@@ -107,20 +106,18 @@ def index():
     return render_template('GDD.html', WarningBar=wb)
 
 
-@socketio.on('connect', namespace='/api')
-@auth.login_required
-def connect():
-    print('client connect')
-    global thread
-    if thread is None:
-        def background_thread():
-            while True:
-                res_down, res_up, res_err = man.status()
-                content = {'download': res_down, 'upload': res_up, 'error': res_err}
-                socketio.emit('newdata', content, namespace='/api')
-                socketio.sleep(REFRESH_INTERVAL)
-        thread = socketio.start_background_task(target=background_thread)
-
-
 if __name__ == "__main__":
+    def background_thread():
+        previous = None
+        while True:
+            current = man.status()
+            if current == previous:
+                socketio.sleep(REFRESH_INTERVAL)
+                continue
+            res_down, res_up, res_err = current
+            previous = current
+            content = {'download': res_down, 'upload': res_up, 'error': res_err}
+            socketio.emit('newdata', content, namespace='/api')
+            socketio.sleep(REFRESH_INTERVAL)
+    thread = socketio.start_background_task(target=background_thread)
     socketio.run(app, host='0.0.0.0', port=SERVER_PORT)
