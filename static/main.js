@@ -23,9 +23,9 @@
 
             function filler(task, cssClass, type) {
                 let div = document.createElement("div");
-                div.classList.add("list-group-item", "list-group-item-action", "list-group-item-info")
+                div.classList.add("list-group-item", "list-group-item-action", cssClass);
                 div.innerText = task.status + " " + task.filename + " : " + task.completedLength + " / " + task.totalLength
-                    + " @ " + task.speed + " [" + Math.round(task.progress * 1000) / 10 + "%, " + task.eta + "]"
+                    + " @ " + task.speed + " [" + Math.round(task.progress * 1000) / 10 + "%, " + task.eta + "]";
                 let x = document.createElement("button");
                 $("status").appendChild(div).appendChild(x);
                 x.innerText = "✖";
