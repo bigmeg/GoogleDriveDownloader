@@ -7,7 +7,9 @@ class TransloadMan:
     def __init__(self):
         self.aria2man = Aria2Man()
         self.GDman = GoogleDriveMan()
-        self.ready = self.GDman.auth_ready
+
+    def ready(self):
+        return self.GDman.auth_ready
 
     def add_task(self, url, filename, upload=True, delete=True):
         dest = os.path.expanduser('~/Downloads/')

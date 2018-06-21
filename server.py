@@ -114,7 +114,7 @@ def status():
 @auth.login_required
 def index():
     wb = ''
-    if not man.ready:
+    if not man.ready():
         wb = "<br><div class=\"alert alert-danger\">"
         wb += "<a href=\"/authGD\">Authentication Required with Google Drive</a></div>"
     return render_template('GDD.html', WarningBar=wb)
