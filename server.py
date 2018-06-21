@@ -44,7 +44,7 @@ def back():
 @app.route("/authGD", methods=['GET', 'POST'])
 @auth.login_required
 def authGD():
-    if man.ready:
+    if man.ready():
         return redirect(url_for('back'))
 
     global last_auth_url
