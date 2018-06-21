@@ -1,13 +1,13 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
     <title>Google Drive Downloader</title>
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"
           integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
+    <script src="static/main.js"></script>
 </head>
 <body>
-
 <div class="container">
     <h2>Google Drive Downloader</h2>
     {{ WarningBar|safe }}
@@ -28,10 +28,12 @@
     <div id="status" class="list-group">
         <br>
     </div>
+
+    <div style="position: fixed; bottom: 1px; right: 1px;">
+        <label for="Refresh Interval">Refresh Interval <span id="interval-val"></span></label>
+        <input type="range" id="interval" name="interval"
+               min="1" max="10" value="1" step="1" style="width: 100px;"/>
+    </div>
 </div>
-
-<script src="static/socket.io.slim.js"></script>
-<script src="static/main.js"></script>
-
 </body>
 </html>

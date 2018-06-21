@@ -1,12 +1,8 @@
 #!/usr/bin/env python3
-import eventlet
-eventlet.monkey_patch()
-
 import configparser, os
 from flask import Flask, render_template, flash, request, make_response, redirect, url_for, jsonify
 from flask_httpauth import HTTPBasicAuth
-from flask_socketio import SocketIO, send, emit
-from transport import Manager
+from TransloadManager import TransloadMan
 from django.core.validators import URLValidator
 from django.core.exceptions import ValidationError
 
@@ -17,15 +13,13 @@ config.read(os.path.join(dir_path, 'settings.ini'))
 USERNAME = config['server']['USERNAME']
 PASSWORD = config['server']['PASSWORD']
 SERVER_PORT = int(config['server']['SERVER_PORT'])
-REFRESH_INTERVAL = int(config['transport']['REFRESH_INTERVAL'])
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(24)
 app.config['DEBUG'] = True
-socketio = SocketIO(app)
 
 # Resources
-man = Manager()
+man = TransloadMan()
 auth = HTTPBasicAuth()
 url_validator = URLValidator()
 last_auth_url = None
@@ -50,7 +44,7 @@ def back():
 @app.route("/authGD", methods=['GET', 'POST'])
 @auth.login_required
 def authGD():
-    if man.auth_ready:
+    if man.ready:
         return redirect(url_for('back'))
 
     global last_auth_url
@@ -67,57 +61,64 @@ def authGD():
     return render_template('authGD.html', link=last_auth_url)
 
 
-@app.route("/api", methods=['GET', 'POST'])
+@app.route("/newtask", methods=['POST'])
 @auth.login_required
-def api():
-    if request.method == 'POST':
-        if not request.is_json:
-            return jsonify({'result': 'not json!? come on!'})
-        data = request.get_json()
-        name = data.get('name')
-        link = data.get('link')
-        upload = data.get('upload')
-        delete = data.get('delete')
-        try:
-            url_validator(link)
-            valid_link = True
-        except ValidationError:
-            valid_link = False
-        if name != '' and valid_link:
-            man.add_new_task(link, name, upload=upload, delete=delete)
-            return jsonify({'result': 'success'})
+def newtask():
+    if not request.is_json:
+        return jsonify({'result': 'not json!? come on!'})
+    data = request.get_json()
+    name = data.get('name')
+    link = data.get('link')
+    upload = data.get('upload')
+    delete = data.get('delete')
+    try:
+        url_validator(link)
+        valid_link = True
+    except ValidationError:
+        valid_link = False
+    if name != '' and valid_link:
+        man.add_task(link, name, upload=upload, delete=delete)
+        return jsonify({'result': 'success'})
+    else:
+        if name != '' and link != '' and not valid_link:
+            return jsonify({'result': 'invalid link'})
         else:
-            if name != '' and link != '' and not valid_link:
-                return jsonify({'result': 'invalid link'})
-            else:
-                return jsonify({'result': 'missing parameter'})
-    elif request.method == 'GET':
-        res_down, res_up, res_err = man.status()
-        return jsonify({'download': res_down, 'upload': res_up, 'error': res_err})
+            return jsonify({'result': 'missing parameter'})
+
+
+@app.route("/remove", methods=['POST'])
+@auth.login_required
+def remove():
+    if not request.is_json:
+        return jsonify({'result': 'not json!? come on!'})
+    data = request.get_json()
+    name = data.get('name')
+    type = data.get('type')
+    if name != '' and type != '':
+        if type == "upload":
+            man.remove_up_task(name)
+        elif type == "download":
+            man.remove_dl_task(name)
+        return jsonify({'result': 'success'})
+    else:
+        return jsonify({'result': 'missing parameter'})
+
+
+@app.route("/status", methods=['GET'])
+@auth.login_required
+def status():
+    return jsonify(man.get_status())
 
 
 @app.route("/", methods=['GET'])
 @auth.login_required
 def index():
     wb = ''
-    if not man.auth_ready:
+    if not man.ready:
         wb = "<br><div class=\"alert alert-danger\">"
         wb += "<a href=\"/authGD\">Authentication Required with Google Drive</a></div>"
     return render_template('GDD.html', WarningBar=wb)
 
 
 if __name__ == "__main__":
-    def background_thread():
-        previous = None
-        while True:
-            current = man.status()
-            if current == previous:
-                socketio.sleep(REFRESH_INTERVAL)
-                continue
-            res_down, res_up, res_err = current
-            previous = current
-            content = {'download': res_down, 'upload': res_up, 'error': res_err}
-            socketio.emit('newdata', content, namespace='/api')
-            socketio.sleep(REFRESH_INTERVAL)
-    thread = socketio.start_background_task(target=background_thread)
-    socketio.run(app, host='0.0.0.0', port=SERVER_PORT)
+    app.run(host='0.0.0.0', port=SERVER_PORT)
