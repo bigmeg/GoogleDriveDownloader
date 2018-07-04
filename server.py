@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import configparser, os
+import sys
 from flask import Flask, render_template, flash, request, make_response, redirect, url_for, jsonify
 from flask_httpauth import HTTPBasicAuth
 from TransloadManager import TransloadMan
@@ -121,4 +122,7 @@ def index():
 
 
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == '--aria2':
+        import subprocess
+        subprocess.Popen(['aria2c', '--enable-rpc'])
     app.run(host='0.0.0.0', port=SERVER_PORT)
