@@ -15,11 +15,12 @@ class Aria2Man:
         while True:
             while len(self.remove_queue) > 0:
                 item = self.remove_queue.pop()
-                self.server.aria2.remove(item["gid"])
+                if response["status"] == 'active':
+                    self.server.aria2.forceRemove(item["gid"])
                 self.server.aria2.removeDownloadResult(item["gid"])
                 self.work_queue.remove(item)
-                os.remove(item["dir"] + item["filename"])
-                os.remove(item["dir"] + item["filename"] + ".aria2")
+                utils.remove_if_exist(item["dir"] + item["filename"])
+                utils.remove_if_exist(item["dir"] + item["filename"] + ".aria2")
             while len(self.wait_queue) > 0:
                 task = self.wait_queue.pop()
                 gid = self.server.aria2.addUri([task["url"]],

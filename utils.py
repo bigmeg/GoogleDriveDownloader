@@ -15,6 +15,11 @@ from concurrent import futures  # if python2, a backport is needed
 from math import log
 import shutil
 
+def remove_if_exist(filename):
+    try:
+        os.remove(filename)
+    except OSError:
+        pass
 
 def combine_files(parts, dest):
     '''
