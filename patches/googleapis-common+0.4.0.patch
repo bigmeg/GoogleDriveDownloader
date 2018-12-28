@@ -7,22 +7,54 @@ patch-package
                  const finale = `--${boundary}--`;
 -                const rStream = new stream.PassThrough();
 -                const pStream = new ProgressStream();
-+                const rStream = new ProgressStream();
++                const rStream = new ProgressStream(finale);
                  const isStream = isReadableStream(multipart[1].body);
                  headers['Content-Type'] = `multipart/related; boundary=${boundary}`;
                  for (const part of multipart) {
-@@ -168,12 +167,12 @@ function createAPIRequestAsync(parameters) {
+@@ -168,17 +167,12 @@ function createAPIRequestAsync(parameters) {
                          // Axios does not natively support onUploadProgress in node.js.
                          // Pipe through the pStream first to read the number of bytes read
                          // for the purpose of tracking progress.
 -                        pStream.on('progress', bytesRead => {
-+                        rStream.on('progress', bytesRead => {
++                        rStream.on('drain', () => {
                              if (options.onUploadProgress) {
-                                 options.onUploadProgress({ bytesRead });
+-                                options.onUploadProgress({ bytesRead });
++                                options.onUploadProgress({ bytesRead: rStream.bytesRead });
                              }
                          });
 -                        part.body.pipe(pStream).pipe(rStream, { end: false });
-+                        part.body.pipe(rStream, { end: false });
-                         part.body.on('end', () => {
-                             rStream.push('\r\n');
-                             rStream.push(finale);
+-                        part.body.on('end', () => {
+-                            rStream.push('\r\n');
+-                            rStream.push(finale);
+-                            rStream.push(null);
+-                        });
++                        part.body.pipe(rStream);
+                     }
+                 }
+                 if (!isStream) {
+@@ -234,16 +228,21 @@ function createAPIRequestAsync(parameters) {
+  * every time the cursor is moved.
+  */
+ class ProgressStream extends stream.Transform {
+-    constructor() {
++    constructor(finale) {
+         super(...arguments);
+         this.bytesRead = 0;
++        this.finale = finale;
+     }
+     // tslint:disable-next-line: no-any
+     _transform(chunk, encoding, callback) {
+         this.bytesRead += chunk.length;
+-        this.emit('progress', this.bytesRead);
+         this.push(chunk);
+         callback();
+     }
++
++    _flush(callback) {
++        this.push('\r\n');
++        this.push(this.finale);
++        callback();
++    }
+ }
+-//# sourceMappingURL=apirequest.js.map
+\ No newline at end of file
