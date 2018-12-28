@@ -1,0 +1,24 @@
+html
+    head
+        title Google Drive Downloader Authentication Page
+        link(rel='stylesheet', href='/stylesheets/bootstrap.css')
+        meta(name='viewport', content='width=device-width, initial-scale=1.0')
+    body
+        div.container
+            h2 Google Drive Downloader Authentication Page
+            br
+            if incorrect
+                div.alert.alert-warning
+                    p Code incorrect, please try again
+                    a(href= link, target='_blank') Google Drive Authentication Link
+            else
+                div.alert.alert-info
+                    p Please visit this link to sign in your Google account and then fill in the returned code
+                    a(href= link, target='_blank') Google Drive Authentication Link
+            br
+            form(action='', method='post', role='form')
+                .form-group
+                    label(for='code') Code:
+                    input#code.form-control(type='text', name='code', placeholder='code from the sign in page')
+                button.btn.btn-success(type='submit') Submit
+

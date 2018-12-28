@@ -1,134 +1,49 @@
+##########################
+# Application specfic
+##########################
+# config/config.js
 
-# Created by https://www.gitignore.io/api/macos,python
+##########################
+# General
+##########################
+.idea/
+#####
+# OS X temporary files
+#
+# c.f. http://www.westwind.com/reference/os-x/invisibles.html
+.DS_Store
 
-### macOS ###
-*.DS_Store
-.AppleDouble
-.LSOverride
-
-# Icon must end with two \r
-Icon
-
-# Thumbnails
-._*
-
-# Files that might appear in the root of a volume
-.DocumentRevisions-V100
-.fseventsd
-.Spotlight-V100
-.TemporaryItems
+# c.f. http://www.westwind.com/reference/os-x/invisibles.html
 .Trashes
-.VolumeIcon.icns
-.com.apple.timemachine.donotpresent
 
-# Directories potentially created on remote AFP share
-.AppleDB
-.AppleDesktop
-Network Trash Folder
-Temporary Items
-.apdisk
+# c.f. http://www.westwind.com/reference/os-x/invisibles.html
+*.swp
 
-### Python ###
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
-
-# C extensions
-*.so
-
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
-*.manifest
-*.spec
-
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-.hypothesis/
-
-# Translations
-*.mo
-*.pot
-
-# Django stuff:
+#####
+# Node stuff
+#
+# Logs
+logs
 *.log
-local_settings.py
+npm-debug.log*
 
-# Flask stuff:
-instance/
-.webassets-cache
+# Runtime data
+pids
+*.pid
+*.seed
 
-# Scrapy stuff:
-.scrapy
+# Coverage directory used by tools like istanbul
+coverage
 
-# Sphinx documentation
-docs/_build/
+# Grunt intermediate storage (http://gruntjs.com/creating-plugins#storing-task-files)
+.grunt
 
-# PyBuilder
-target/
+# node-waf misc
+.lock-wscript
 
-# Jupyter Notebook
-.ipynb_checkpoints
+# Compiled binary addons (http://nodejs.org/api/addons.html)
+build/Release
 
-# pyenv
-.python-version
-
-# celery beat schedule file
-celerybeat-schedule
-
-# SageMath parsed files
-*.sage.py
-
-# Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# Spyder project settings
-.spyderproject
-.spyproject
-
-# Rope project settings
-.ropeproject
-
-# mkdocs documentation
-/site
-
-# mypy
-.mypy_cache/
-
-# End of https://www.gitignore.io/api/macos,python
+# Dependency directory
+# https://docs.npmjs.com/misc/faq#should-i-check-my-node-modules-folder-into-git
+node_modules

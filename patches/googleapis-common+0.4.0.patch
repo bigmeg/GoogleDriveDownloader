@@ -1,0 +1,20 @@
+patch-package
+--- a/node_modules/googleapis-common/build/src/apirequest.js
++++ b/node_modules/googleapis-common/build/src/apirequest.js
+@@ -174,10 +174,12 @@ function createAPIRequestAsync(parameters) {
+                             }
+                         });
+                         part.body.pipe(pStream).pipe(rStream, { end: false });
+-                        part.body.on('end', () => {
+-                            rStream.push('\r\n');
+-                            rStream.push(finale);
+-                            rStream.push(null);
++                        pStream.on('end', () => {
++                            rStream.on('drain', () => {
++                                rStream.push('\r\n');
++                                rStream.push(finale);
++                                rStream.push(null);
++                            });
+                         });
+                     }
+                 }

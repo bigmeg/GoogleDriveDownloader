@@ -1,0 +1,25 @@
+{
+  "name": "googel-drive-downloader",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node ./server.js",
+    "prepare": "patch-package"
+  },
+  "dependencies": {
+    "aria2": "^4.0.3",
+    "axios": "~0.18.0",
+    "cookie-parser": "~1.4.3",
+    "debug": "~2.6.9",
+    "express": "~4.16.0",
+    "googleapis": "^35.0.0",
+    "http-errors": "~1.6.2",
+    "mime-types": "^2.1.21",
+    "morgan": "~1.9.0",
+    "pug": "2.0.0-beta11"
+  },
+  "devDependencies": {
+    "patch-package": "^5.1.1",
+    "postinstall-prepare": "^1.0.1"
+  }
+}

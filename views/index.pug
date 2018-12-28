@@ -1,0 +1,59 @@
+doctype html
+html
+  head
+    title Google Drive Downloader
+    link(rel='stylesheet', href='/stylesheets/bootstrap.css')
+    meta(name='viewport', content="width=device-width, initial-scale=1.0")
+    script(src='/javascripts/jquery.js')
+    script(src='/javascripts/main.js')
+    script(src='/javascripts/notify.js')
+
+  body
+    div.container
+      block content
+        h2 Google Drive Downloader
+        br
+        if login.required
+          div.alert.alert-danger
+            a(href='/auth') Authentication Required with Google Drive
+        form
+          .input-group.mb-3
+            .input-group-prepend
+              span.input-group-text Name
+            input#name.form-control(type='text', placeholder='name of the file')
+          .input-group.mb-3
+            .input-group-prepend
+              span.input-group-text URI
+            input#link.form-control(type='text', placeholder='link of the file')
+
+          input#upl(type='checkbox', checked='')
+          | #{' '}upload at complete #{' '}
+
+          input#del(type='checkbox', checked='')
+          | #{' '}delete after finish
+        button#btn.btn.btn-success Submit
+
+    br
+    br
+    br
+    .container
+      h5.mt-0.text-secondary Download Queue
+      div#downloadQueue
+
+    .container
+      h5.mt-0.text-info Upload Queue
+      div#uploadQueue
+
+    .container
+      h5.mt-0.text-success Completed Queue
+      div#completedQueue
+
+
+
+    div(style='position: fixed; bottom: 1px; right: 1px;')
+      label() Refresh Interval #{' '}
+        span#interval-val
+      input#interval(type='range', name='interval', min='1', max='10', value='1', step='1', style='width: 100px;')
+
+
+
