@@ -1,20 +1,28 @@
 patch-package
 --- a/node_modules/googleapis-common/build/src/apirequest.js
 +++ b/node_modules/googleapis-common/build/src/apirequest.js
-@@ -174,10 +174,12 @@ function createAPIRequestAsync(parameters) {
+@@ -153,8 +153,7 @@ function createAPIRequestAsync(parameters) {
+                 ];
+                 const boundary = uuid.v4();
+                 const finale = `--${boundary}--`;
+-                const rStream = new stream.PassThrough();
+-                const pStream = new ProgressStream();
++                const rStream = new ProgressStream();
+                 const isStream = isReadableStream(multipart[1].body);
+                 headers['Content-Type'] = `multipart/related; boundary=${boundary}`;
+                 for (const part of multipart) {
+@@ -168,12 +167,12 @@ function createAPIRequestAsync(parameters) {
+                         // Axios does not natively support onUploadProgress in node.js.
+                         // Pipe through the pStream first to read the number of bytes read
+                         // for the purpose of tracking progress.
+-                        pStream.on('progress', bytesRead => {
++                        rStream.on('progress', bytesRead => {
+                             if (options.onUploadProgress) {
+                                 options.onUploadProgress({ bytesRead });
                              }
                          });
-                         part.body.pipe(pStream).pipe(rStream, { end: false });
--                        part.body.on('end', () => {
--                            rStream.push('\r\n');
--                            rStream.push(finale);
--                            rStream.push(null);
-+                        pStream.on('end', () => {
-+                            rStream.on('drain', () => {
-+                                rStream.push('\r\n');
-+                                rStream.push(finale);
-+                                rStream.push(null);
-+                            });
-                         });
-                     }
-                 }
+-                        part.body.pipe(pStream).pipe(rStream, { end: false });
++                        part.body.pipe(rStream, { end: false });
+                         part.body.on('end', () => {
+                             rStream.push('\r\n');
+                             rStream.push(finale);
